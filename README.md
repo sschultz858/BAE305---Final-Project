@@ -1,6 +1,11 @@
 # BAE305 Final Project - Autonomous Safety System: Determining Various Limitations of lidar Sensors
 Lindsey Campbell, John Mann, Samantha Schultz, Ben Shacklett
 
+## Project Overview Video
+Click the link below to view the video:
+
+https://drive.google.com/file/d/1KocY4k-lSZVaCZu_2zKtMyaCXENPycNH/view?usp=sharing
+
 ## Summary
 With an increasing popularity in autonomous machines (cars, drones, lawnmowers, vacuums, etc. …), it is crucial for us as engineers to understand how the safety systems of this technology work. Sensors act as the eyes and ears for the machines, so knowing the limitations and primary functions of the most common sensors has a lot of utility when designing such systems.
 
@@ -25,6 +30,95 @@ Overall, the system was accurate, never indicating a clear danger zone when ther
 ### Setting Up the RaspberryPi:
 Plug the RaspberryPi into power and connect it to the monitor, mouse and keyboard using an HDMI cable and USB cables respectively. Once the RaspberryPi is booted up, let it check for any updates it may need and install those accordingly. Once the RaspberryPi is up to date, open the IDLE programming tool on the Pi. The code provided can be copied and pasted or manually typed to change how or what the lidar will output. At this stage, the lidar device driver can be plugged into the RaspberryPi using the micro USB cable. Once the driver is plugged in, the power light should be displayed on the driver. From here, the lidar’s ribbon connection can be used to connect the lidar to its driver. Once the lidar is connected, it will automatically start running. However, no data will be gathered or output until a program is run on the RaspberryPi. From here, all connection in the wiring schematic should be complete. The program which was either typed or pasted into the IDLE on the RaspberryPi can now be run and the lidar will gather the desired data and output it to the monitor. The final construction is seen below:
 <img src="https://github.com/sschultz858/BAE305---Final-Project/blob/65f1dc3365f63e79cacdeb90b3f4db1a5a9544e7/BAE305_ProjectCircuitDrawing.png" width="1200">
+
+Final version of code is seen below:
+
+
+         #Consume LIDAR measurement file and create an image for display.
+         #Adafruit invests time and resources providing this open source code.
+         #Please support Adafruit and open source hardware by purchasing
+         #products from Adafruit!
+         #Written by Dave Astels for Adafruit Industries
+         #Copyright (c) 2019 Adafruit Industries
+         #Licensed under the MIT license.
+         #All text above must be included in any redistribution.
+
+        import os
+        from math import cos, sin, pi, floor, sqrt, pow
+        import pygame
+        from adafruit_rplidar import RPLidar
+        from itertools import chain
+
+        # Set up pygame and the display
+        os.putenv('SDL_FBDEV', '/dev/fb1')
+        pygame.init()
+        lcd = pygame.display.set_mode((320,240))
+        pygame.mouse.set_visible(False)
+        lcd.fill((0,0,0))
+        pygame.display.update()
+
+        # Setup the RPLidar
+        PORT_NAME = '/dev/ttyUSB0'
+        lidar = RPLidar(None, PORT_NAME)
+
+        # used to scale data to fit on the screen
+        max_distance = 0
+        stopped = False
+
+
+        danger_distance = 1500
+        #pylint: disable=redefined-outer-name,global-statement
+        def process_data(data):     #def starts a function, process_data is the name
+            global max_distance
+            global stopped
+            lcd.fill((0,0,0))
+            danger_flag = False
+            for angle in chain(range(350,360), range(0,10)):
+                distance = data[angle]
+                if distance > 0:     # ignore initially ungathered data points
+                    max_distance = max([min([5000, distance]), max_distance])
+                    radians = angle * pi / 180.0
+                    x = distance * cos(radians)
+                    y = distance * sin(radians)
+                    point = (160 + int(x / max_distance * 119), 120 + int(y / max_distance * 119))
+                    lcd.set_at(point, pygame.Color(255, 255, 255))
+                    print(f"angle:{angle},\tdistance:{distance}")
+                    if distance < danger_distance:
+                        danger_flag = True
+            if danger_flag:
+                print("stop")
+                stopped = True
+            else:
+                print("clear")
+                stopped = False
+
+        #                 if stopped == True:
+        #                     print("Just Cleared")
+        #                     stopped = False
+
+    
+            pygame.display.update()
+
+
+
+        scan_data = [0]*360
+
+        try:
+        #     if actual_distance > 10:
+            print(lidar.info)
+            for scan in lidar.iter_scans():
+                for (_, angle, distance) in scan:
+                    scan_data[min([359, floor(angle)])] = distance
+                process_data(scan_data)
+    
+          #  if actual_distance < 10:
+               # print("STOP")
+               # lidar.stop()
+    
+        except KeyboardInterrupt:
+            print('Stoping.')
+        lidar.stop()
+        lidar.disconnect()
 
 
 ### Assembling Test Dummy/Target:
@@ -100,5 +194,3 @@ The mirror caused substantial malfunctions in the lidar system. Although the dis
 In hindsight, results would have been much more comprehensive with a large sample size. The patterns described were observable from several iterations of code and hundreds of distance readings, but not all intricacies were observable in our 3-trial results table. Providing a sample of 30+ distances for each condition would have allowed a more detailed comparison between standard deviations in data and a more illustrative understanding of the limitations of the sensor.
 
 Our results have a few implications for the use of lidar sensor systems in autonomous vehicles. For one, lidar function is not dependent on bright or dark surrounding light, so these systems should not falter from day to night. Light mist did not affect the lidar function, but larger particles or water droplets could catch the sensor’s attention reading faulty distances. Shiny and highly reflective surfaces were the biggest obstacle we found. Strange reflections bounce the laser lights around unpredictably causing system malfunction because distances are calculated based on time for the light to return.
-
-
